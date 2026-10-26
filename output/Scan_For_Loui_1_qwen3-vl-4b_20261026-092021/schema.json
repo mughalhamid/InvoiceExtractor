@@ -1,0 +1,317 @@
+{
+  "type": [
+    "object",
+    "null"
+  ],
+  "properties": {
+    "Supplier": {
+      "type": "object",
+      "properties": {
+        "Name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "Address": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "VatNumber": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "Name",
+        "Address",
+        "VatNumber"
+      ]
+    },
+    "Customer": {
+      "type": "object",
+      "properties": {
+        "Name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "Address": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "VatNumber": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "Name",
+        "Address",
+        "VatNumber"
+      ]
+    },
+    "InvoiceNumber": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "InvoiceDate": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "Currency": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "LineItems": {
+      "type": "array",
+      "items": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "Description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "Quantity": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "UnitPrice": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "VatRate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "TotalExclVat": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "TotalInclVat": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "IsFullyStruckOut": {
+            "type": "boolean"
+          },
+          "HasSignatureNearStrikeout": {
+            "type": "boolean"
+          },
+          "Corrections": {
+            "type": "array",
+            "items": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "Field": {
+                  "type": "string"
+                },
+                "OriginalValue": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "NewValue": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "HasSignatureNearby": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "Field",
+                "OriginalValue",
+                "NewValue",
+                "HasSignatureNearby"
+              ]
+            }
+          }
+        },
+        "required": [
+          "Description",
+          "Quantity",
+          "UnitPrice",
+          "VatRate",
+          "TotalExclVat",
+          "TotalInclVat",
+          "IsFullyStruckOut",
+          "HasSignatureNearStrikeout",
+          "Corrections"
+        ]
+      }
+    },
+    "Totals": {
+      "type": "object",
+      "properties": {
+        "Subtotal": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "VatAmount": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "Total": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "Subtotal",
+        "VatAmount",
+        "Total"
+      ]
+    },
+    "Stamps": {
+      "type": "array",
+      "items": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "Text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "PoNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "DateReceived": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "HasSignature": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "Text",
+          "PoNumber",
+          "DateReceived",
+          "HasSignature"
+        ]
+      }
+    },
+    "HandwrittenNotes": {
+      "type": "array",
+      "items": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "Text": {
+            "type": "string"
+          },
+          "Location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "Text",
+          "Location"
+        ]
+      }
+    },
+    "Signatures": {
+      "type": "array",
+      "items": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "Location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "AssociatedWith": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "Location",
+          "AssociatedWith"
+        ]
+      }
+    },
+    "ModelComments": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "Supplier",
+    "Customer",
+    "InvoiceNumber",
+    "InvoiceDate",
+    "Currency",
+    "LineItems",
+    "Totals",
+    "Stamps",
+    "HandwrittenNotes",
+    "Signatures",
+    "ModelComments"
+  ]
+}
