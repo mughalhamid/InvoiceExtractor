@@ -27,13 +27,16 @@ dotnet run -- samples\Scan_For_Loui_1.pdf
 dotnet run -- samples\scan_invoice_with_price_change_2.pdf
 ```
 
-Options: `--model`, `--dpi` (default 200), `--password`, `--ctx` (default 16384), `--think`, `--out`.
+Options: `--model`, `--dpi` (default 150), `--password`, `--ctx` (default 12288),
+`--max-tokens` (default 4096), `--timeout` minutes per page (default 20), `--think`, `--quiet`,
+`--keep-loaded`, `--out`. Press Ctrl+C to stop cleanly; the model is unloaded at the end.
 
 ## Output (per run, in `output\<file>_<model>_<timestamp>\`)
 
 - `page-1.png`       what the model saw
 - `schema.json`      the contract sent to the model
 - `page-1.raw.json`  the model's raw answer
+- `page-1.partial.txt` what was generated before a timeout or Ctrl+C
 - `page-1.json`      parsed invoice + review flags
 
 ## Tuning tips

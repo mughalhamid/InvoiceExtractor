@@ -11,9 +11,15 @@ public static class Prompts
         Extract the data into the JSON schema provided. Follow these rules exactly.
 
         PARTIES
-        - Supplier = the company that ISSUED the invoice (usually its logo and address at the top).
-        - Customer = the company being billed (account / delivery / "bill to" block).
-        - Never put the customer's VAT number in the supplier's field, or the reverse.
+        - Supplier = the company that ISSUED the invoice. Its name is usually in the logo or letterhead.
+          Its address, VAT number and phone are printed in the letterhead block, which may be on the
+          left, right or top, and may be separate from the logo. This block has NO label like
+          "Bill to" or "Account".
+        - Customer = the company being billed. Its block is usually LABELLED, e.g. "Account No",
+          "Customer", "Bill to", "Deliver to", "Sold to", and often has an account code.
+        - Decide which block is which ONCE, using the labels, then do not revisit the decision.
+        - An invoice normally shows BOTH VAT numbers. Never put the customer's VAT number in the
+          supplier's field, or the reverse, and do not return null for one just because you found the other.
 
         LINE ITEMS
         - One entry per printed row in the item table, in order, including struck-out rows.
