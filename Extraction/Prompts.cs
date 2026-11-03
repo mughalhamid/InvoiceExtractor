@@ -49,7 +49,7 @@ public static class Prompts
           next to the totals, a comment at the bottom), each one ONCE, with where it appears.
         - Most invoices have 0 to 3 such notes. Never repeat a note.
 
-        If something is unreadable or you are unsure, use null and explain in ModelComments.
-        Never invent values.
+        If something is unreadable or you are unsure, use null. Never invent values.
+        Stop as soon as every field is filled. Do not add commentary.
         """;
 }

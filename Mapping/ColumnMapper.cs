@@ -99,8 +99,7 @@ public sealed class ColumnMapper
             x.HandwrittenNotes ?? new List<HandwrittenNote>(),
             new ColumnMappingReport(mapped, unmapped),
             Reconciliation: null,
-            ReviewFlags: new List<string>(),
-            x.ModelComments);
+            ReviewFlags: new List<string>());
     }
 
     /// <summary>Parses printed amounts like "6.50", "19.500E", "€ 1,234.50". Null if not a number.</summary>

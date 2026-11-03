@@ -25,8 +25,7 @@ public record InvoiceExtraction(
     ItemTable ItemTable,
     Totals Totals,
     List<Stamp> Stamps,
-    List<HandwrittenNote> HandwrittenNotes,
-    string? ModelComments);
+    List<HandwrittenNote> HandwrittenNotes);
 
 public record Party(
     string? Name,

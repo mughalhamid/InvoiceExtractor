@@ -18,8 +18,7 @@ public record InvoiceResult(
     List<HandwrittenNote> HandwrittenNotes,
     ColumnMappingReport ColumnMapping,
     Reconciliation? Reconciliation,
-    List<string> ReviewFlags,
-    string? ModelComments);
+    List<string> ReviewFlags);
 
 public record LineItem(
     int RowNumber,
