@@ -19,9 +19,38 @@ public static class InvoiceSchema
         WriteIndented = true
     };
 
+    /// <summary>
+    /// Maximum length per list. Ollama turns the schema into a grammar, so the model
+    /// physically cannot add a 16th handwritten note: this is what stops repetition loops.
+    /// Generous for real invoices, tight enough to stop runaway output.
+    /// </summary>
+    private static readonly Dictionary<string, int> MaxItems = new()
+    {
+        ["Headers"] = 15,
+        ["Rows"] = 60,
+        ["Cells"] = 15,
+        ["Corrections"] = 4,
+        ["Stamps"] = 5,
+        ["HandwrittenNotes"] = 15
+    };
+
     public static JsonNode Build()
     {
-        var schema = JsonOptions.GetJsonSchemaAsNode(typeof(InvoiceExtraction));
+        var exporterOptions = new JsonSchemaExporterOptions
+        {
+            TransformSchemaNode = (context, node) =>
+            {
+                if (context.PropertyInfo is { } property &&
+                    MaxItems.TryGetValue(property.Name, out var max) &&
+                    node is JsonObject obj)
+                {
+                    obj["maxItems"] = max;
+                }
+                return node;
+            }
+        };
+
+        var schema = JsonOptions.GetJsonSchemaAsNode(typeof(InvoiceExtraction), exporterOptions);
         MakeAllPropertiesRequired(schema);
         return schema;
     }

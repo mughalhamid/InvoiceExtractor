@@ -13,4 +13,9 @@
     <PackageReference Include="PDFtoImage" Version="4.1.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Column header -> field mapping; edit without recompiling -->
+    <None Update="column-mappings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

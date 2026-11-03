@@ -1,15 +1,19 @@
 namespace InvoiceExtractor.Models;
 
 // ---------------------------------------------------------------------------
-// The output contract. These records are turned into a JSON schema and sent to
-// the model, which is forced to answer in exactly this shape.
+// What the MODEL returns. These records are turned into a JSON schema and sent
+// to the model, which is forced to answer in exactly this shape.
 //
-// Design choices for v1:
-//  - Amounts are strings, copied exactly as printed/written ("8.00", "10.00").
-//    Parsing and maths happen later in C# rules, never inside the model.
+// Design choices:
+//  - The item table is read VERBATIM: the printed headers once, then each row's
+//    cells in the same order. The model does not decide what a column means;
+//    C# does that later (see Mapping/ColumnMapper.cs). This avoids guessing and
+//    copes with headers that change between suppliers.
+//  - Amounts are strings, copied exactly as printed/written ("8.00", "19.500E").
+//    Parsing and maths happen in C#, never inside the model.
+//  - Every list has a maximum length in the schema (Extraction/InvoiceSchema.cs),
+//    so a small model cannot loop forever adding items.
 //  - No bounding boxes yet: a 4B local model gives unreliable coordinates.
-//    We rely on "HasSignatureNearby" for now and add geometry in a later step.
-//  - Keep it small. Small models get worse as the schema grows.
 // ---------------------------------------------------------------------------
 
 public record InvoiceExtraction(
@@ -18,11 +22,10 @@ public record InvoiceExtraction(
     string? InvoiceNumber,
     string? InvoiceDate,
     string? Currency,
-    List<LineItem> LineItems,
+    ItemTable ItemTable,
     Totals Totals,
     List<Stamp> Stamps,
     List<HandwrittenNote> HandwrittenNotes,
-    List<Signature> Signatures,
     string? ModelComments);
 
 public record Party(
@@ -30,22 +33,22 @@ public record Party(
     string? Address,
     string? VatNumber);
 
-public record LineItem(
-    string? Description,
-    string? Quantity,
-    string? UnitPrice,
-    string? VatRate,
-    string? TotalExclVat,
-    string? TotalInclVat,
+/// <summary>The line-item table exactly as printed.</summary>
+public record ItemTable(
+    List<string> Headers,       // column headers left to right, e.g. ["Quantity","Description","Expiry",...]
+    List<TableRow> Rows);
+
+public record TableRow(
+    List<string?> Cells,        // one value per header, same order; null if empty
     bool IsFullyStruckOut,
     bool HasSignatureNearStrikeout,
     List<Correction> Corrections);
 
-/// <summary>A partial strikeout: one value crossed out and (usually) a new value written by hand.</summary>
+/// <summary>A partial strikeout: one printed value crossed out and (usually) a new value written by hand.</summary>
 public record Correction(
-    string Field,              // which column changed, e.g. "TotalExclVat", "ExpiryDate"
-    string? OriginalValue,     // the struck-out printed value
-    string? NewValue,          // the handwritten replacement, null if none
+    string Column,              // the printed header of the changed column, e.g. "Total" or "Expiry"
+    string? OriginalValue,      // the struck-out printed value
+    string? NewValue,           // the handwritten replacement, null if none
     bool HasSignatureNearby);
 
 public record Totals(
@@ -54,15 +57,11 @@ public record Totals(
     string? Total);
 
 public record Stamp(
-    string? Text,              // printed text of the stamp, e.g. "Il-Mosta"
+    string? Text,               // printed text of the stamp, e.g. "Il-Mosta"
     string? PoNumber,
     string? DateReceived,
     bool HasSignature);
 
 public record HandwrittenNote(
     string Text,
-    string? Location);         // e.g. "next to totals", "bottom of page"
-
-public record Signature(
-    string? Location,          // e.g. "inside stamp", "right of line 3"
-    string? AssociatedWith);   // what it is signing, e.g. "stamp", "line 3 correction"
+    string? Location);          // e.g. "next to totals", "bottom of page"

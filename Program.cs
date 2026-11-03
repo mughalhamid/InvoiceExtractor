@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using InvoiceExtractor.Ai;
 using InvoiceExtractor.Extraction;
+using InvoiceExtractor.Mapping;
 using InvoiceExtractor.Models;
 using InvoiceExtractor.Pdf;
 using InvoiceExtractor.Rules;
@@ -44,6 +45,10 @@ Directory.CreateDirectory(runDir);
 Console.WriteLine($"Rendering '{options.InputPath}' at {options.Dpi} DPI...");
 var pages = PdfRenderer.RenderToImages(options.InputPath, runDir, options.Dpi, options.Password);
 Console.WriteLine($"  {pages.Count} page(s).");
+
+// Column header -> field mapping, applied in C# after the model has read the table verbatim
+var mappingPath = Path.Combine(AppContext.BaseDirectory, "column-mappings.json");
+var columnMapper = ColumnMapper.Load(mappingPath);
 
 // 2. Build the output contract (JSON schema) from the C# records
 var schema = InvoiceSchema.Build();
@@ -147,10 +152,10 @@ try
         }
 
         // 4. Validate the shape: if this fails, the model broke the contract
-        InvoiceExtraction? invoice;
+        InvoiceExtraction? extraction;
         try
         {
-            invoice = JsonSerializer.Deserialize<InvoiceExtraction>(response.Json, InvoiceSchema.JsonOptions);
+            extraction = JsonSerializer.Deserialize<InvoiceExtraction>(response.Json, InvoiceSchema.JsonOptions);
         }
         catch (JsonException ex)
         {
@@ -158,17 +163,16 @@ try
             Console.Error.WriteLine($"  Raw output saved to {rawPath}");
             continue;
         }
-        if (invoice is null) continue;
-        invoice = invoice with { LineItems = invoice.LineItems ?? new List<LineItem>() };
+        if (extraction is null) continue;
 
-        // 5. Business rules in plain C#
-        var flags = ReviewRules.Evaluate(invoice);
+        // 5. Map printed columns to our fields, then apply business rules (both plain C#)
+        var invoice = ReviewRules.Apply(columnMapper.Map(extraction));
 
-        var result = new { Source = options.InputPath, Page = i + 1, response.Model, Invoice = invoice, ReviewFlags = flags };
+        var result = new { Source = options.InputPath, Page = i + 1, response.Model, Invoice = invoice };
         var resultPath = Path.Combine(runDir, $"page-{i + 1}.json");
         await File.WriteAllTextAsync(resultPath, JsonSerializer.Serialize(result, InvoiceSchema.JsonOptions));
 
-        PrintSummary(invoice, flags);
+        PrintSummary(invoice);
         Console.WriteLine($"  Saved: {resultPath}");
     }
 }
@@ -185,23 +189,31 @@ finally
 Console.WriteLine($"\nAll output in: {Path.GetFullPath(runDir)}");
 return 0;
 
-static void PrintSummary(InvoiceExtraction inv, List<string> flags)
+static void PrintSummary(InvoiceResult inv)
 {
     Console.WriteLine($"  Supplier : {inv.Supplier?.Name} | VAT {inv.Supplier?.VatNumber}");
     Console.WriteLine($"  Customer : {inv.Customer?.Name} | VAT {inv.Customer?.VatNumber}");
     Console.WriteLine($"  Invoice  : {inv.InvoiceNumber} | {inv.InvoiceDate} | Total {inv.Totals?.Total} {inv.Currency}");
     Console.WriteLine($"  Lines    : {inv.LineItems.Count} " +
                       $"(struck out: {inv.LineItems.Count(l => l.IsFullyStruckOut)}, " +
-                      $"corrections: {inv.LineItems.Sum(l => l.Corrections?.Count ?? 0)})");
-    Console.WriteLine($"  Stamps   : {inv.Stamps?.Count ?? 0} | Notes: {inv.HandwrittenNotes?.Count ?? 0} | Signatures: {inv.Signatures?.Count ?? 0}");
+                      $"corrections: {inv.LineItems.Sum(l => l.Corrections.Count)})");
+    Console.WriteLine($"  Columns  : mapped {string.Join(", ", inv.ColumnMapping.Mapped.Select(m => $"{m.Key}->{m.Value}"))}");
+    if (inv.ColumnMapping.Unmapped.Count > 0)
+        Console.WriteLine($"             unmapped {string.Join(", ", inv.ColumnMapping.Unmapped)}");
+    Console.WriteLine($"  Stamps   : {inv.Stamps.Count} | Handwritten notes: {inv.HandwrittenNotes.Count}");
 
-    if (flags.Count == 0)
+    if (inv.Reconciliation is { } r)
+        Console.WriteLine($"  Maths    : lines sum {r.SumOfPrintedLines:0.00} vs subtotal {r.PrintedSubtotal:0.00} " +
+                          $"({(r.PrintedLinesMatchSubtotal ? "match" : "MISMATCH")}); " +
+                          $"after strikeouts and corrections {r.AdjustedTotal:0.00}");
+
+    if (inv.ReviewFlags.Count == 0)
     {
         Console.WriteLine("  Review   : no flags");
         return;
     }
     Console.WriteLine("  Review flags:");
-    foreach (var f in flags) Console.WriteLine($"    - {f}");
+    foreach (var f in inv.ReviewFlags) Console.WriteLine($"    - {f}");
 }
 
 record CliOptions(

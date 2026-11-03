@@ -1,0 +1,10 @@
+{
+  "_comment": "Printed column header -> our field. Headers are compared lower-case with spaces, dots and colons removed. Add a supplier's header here once its meaning is confirmed; unknown headers are kept under OtherColumns and reported, never guessed.",
+  "Description": [ "description", "item", "items", "product", "article", "goods", "itemdescription", "productdescription" ],
+  "Quantity": [ "quantity", "qty", "pcs", "units", "noofunits" ],
+  "UnitPrice": [ "price", "unitprice", "priceperunit", "price/unit", "rate", "unitcost" ],
+  "VatRate": [ "vat%", "vatrate", "tax%", "taxrate" ],
+  "TotalExclVat": [ "total", "amount", "net", "netamount", "totalexclvat", "totalexvat", "amountexclvat", "linetotal" ],
+  "TotalInclVat": [ "totalinclvat", "amountinclvat", "grossamount", "totalincvat" ],
+  "Expiry": [ "expiry", "exp", "expirydate", "bestbefore", "bbd" ]
+}
