@@ -4,6 +4,7 @@
   "Quantity": [ "quantity", "qty", "pcs", "units", "noofunits" ],
   "UnitPrice": [ "price", "unitprice", "priceperunit", "price/unit", "rate", "unitcost" ],
   "VatRate": [ "vat%", "vatrate", "tax%", "taxrate" ],
+  "VatAmount": [ "vatamount", "vatamt", "taxamount", "taxamt" ],
   "TotalExclVat": [ "total", "amount", "net", "netamount", "totalexclvat", "totalexvat", "amountexclvat", "linetotal" ],
   "TotalInclVat": [ "totalinclvat", "amountinclvat", "grossamount", "totalincvat" ],
   "Expiry": [ "expiry", "exp", "expirydate", "bestbefore", "bbd" ]

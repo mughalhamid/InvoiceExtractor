@@ -1,0 +1,9 @@
+{
+  "_comment": "Known suppliers. A block whose VAT number is listed here is the supplier, whatever its position or label. Add a supplier once its VAT number is confirmed. VAT numbers are compared upper-case without spaces, dots or dashes.",
+  "Suppliers": [
+    {
+      "Name": "J.Calleja Import & Export Ltd",
+      "VatNumbers": [ "MT10062724" ]
+    }
+  ]
+}

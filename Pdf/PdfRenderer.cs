@@ -1,4 +1,5 @@
 using PDFtoImage;
+using SkiaSharp;
 
 namespace InvoiceExtractor.Pdf;
 
@@ -33,12 +34,34 @@ public static class PdfRenderer
         for (var i = 0; i < pageCount; i++)
         {
             var pngPath = Path.Combine(outputDir, $"page-{i + 1}.png");
-            Conversion.SavePng(pngPath, pdfBytes, page: i, password: password,
+            Conversion.SavePng(pngPath, pdfBytes, page: new Index(i), password: password,
                 options: new RenderOptions(Dpi: dpi));
             pages.Add(pngPath);
         }
 #pragma warning restore CA1416
 
         return pages;
+    }
+
+    /// <summary>
+    /// A sharper copy of one page for the pen-mark pass: re-rendered from the PDF at
+    /// <paramref name="dpi"/>, or, for an image input, the image enlarged
+    /// <paramref name="imageScale"/> times (no new detail, but bigger strokes for the model).
+    /// </summary>
+    public static SKBitmap RenderHighRes(string inputPath, string pageImagePath, int pageIndex, int dpi,
+        string? password, int imageScale = 2)
+    {
+        if (Path.GetExtension(inputPath).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+#pragma warning disable CA1416
+            return Conversion.ToImage(File.ReadAllBytes(inputPath), new Index(pageIndex), password,
+                new RenderOptions(Dpi: dpi));
+#pragma warning restore CA1416
+        }
+
+        using var original = SKBitmap.Decode(pageImagePath)
+                             ?? throw new InvalidOperationException($"Could not read image '{pageImagePath}'.");
+        return original.Resize(new SKImageInfo(original.Width * imageScale, original.Height * imageScale),
+            SKFilterQuality.High);
     }
 }

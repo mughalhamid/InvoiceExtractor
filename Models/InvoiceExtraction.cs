@@ -1,59 +1,72 @@
 namespace InvoiceExtractor.Models;
 
 // ---------------------------------------------------------------------------
-// What the MODEL returns. These records are turned into a JSON schema and sent
-// to the model, which is forced to answer in exactly this shape.
+// What the MODEL returns in PASS 1 (the whole page). These records are turned
+// into a JSON schema and sent to the model, which is forced to answer in this shape.
 //
-// Design choices:
+// Design choices ("the model reads, C# decides"):
+//  - Address blocks are copied VERBATIM with their printed label. The model does not
+//    decide which block is the supplier; C# does (Mapping/PartyResolver.cs). Prompt
+//    wording alone could not stop a 4B model swapping supplier and customer.
 //  - The item table is read VERBATIM: the printed headers once, then each row's
-//    cells in the same order. The model does not decide what a column means;
-//    C# does that later (see Mapping/ColumnMapper.cs). This avoids guessing and
-//    copes with headers that change between suppliers.
-//  - Amounts are strings, copied exactly as printed/written ("8.00", "19.500E").
+//    cells in the same order. C# decides what each column means (Mapping/ColumnMapper.cs).
+//  - No pen marks here: a 4B model reading the whole page missed every one of them.
+//    Pass 2 looks only at the strips where C# found ink (Extraction/PenMarkPass.cs).
+//  - Amounts are strings, copied exactly as printed ("8.00", "19.500E").
 //    Parsing and maths happen in C#, never inside the model.
 //  - Every list has a maximum length in the schema (Extraction/InvoiceSchema.cs),
 //    so a small model cannot loop forever adding items.
-//  - No bounding boxes yet: a 4B local model gives unreliable coordinates.
 // ---------------------------------------------------------------------------
 
 public record InvoiceExtraction(
-    Party Supplier,
-    Party Customer,
+    string? LogoText,
+    List<AddressBlock> AddressBlocks,
     string? InvoiceNumber,
     string? InvoiceDate,
     string? Currency,
-    ItemTable ItemTable,
+    PrintedTable ItemTable,
     Totals Totals,
+    PrintedTable VatSummary,
+    List<Charge> OtherCharges,
+    List<Signature> Signatures,
     List<Stamp> Stamps,
     List<HandwrittenNote> HandwrittenNotes);
 
-public record Party(
-    string? Name,
-    string? Address,
-    string? VatNumber);
+/// <summary>A block of name/address lines exactly as printed, e.g. a letterhead or "Account No" box.</summary>
+public record AddressBlock(
+    string? Label,              // printed label of the block, e.g. "Account No: SGM008", "Bill to"; null if none
+    List<string> Lines,         // every printed line of the block, top to bottom, including VAT/Tel lines
+    string? VatNumber);         // the VAT number printed in this block, exactly as printed
 
-/// <summary>The line-item table exactly as printed.</summary>
-public record ItemTable(
-    List<string> Headers,       // column headers left to right, e.g. ["Quantity","Description","Expiry",...]
+/// <summary>A printed table exactly as printed: headers once, then one list of cells per row.</summary>
+public record PrintedTable(
+    List<string> Headers,       // column headers left to right
     List<TableRow> Rows);
 
 public record TableRow(
-    List<string?> Cells,        // one value per header, same order; null if empty
-    bool IsFullyStruckOut,
-    bool HasSignatureNearStrikeout,
-    List<Correction> Corrections);
+    List<string?> Cells);       // one value per header, same order; null if empty
 
-/// <summary>A partial strikeout: one printed value crossed out and (usually) a new value written by hand.</summary>
-public record Correction(
-    string Column,              // the printed header of the changed column, e.g. "Total" or "Expiry"
-    string? OriginalValue,      // the struck-out printed value
-    string? NewValue,           // the handwritten replacement, null if none
-    bool HasSignatureNearby);
+/// <summary>Party after C# has decided which address block is which (not filled by the model).</summary>
+public record Party(
+    string? Name,
+    string? Address,
+    string? VatNumber,
+    string? AccountNumber = null);   // e.g. "SGM008" from "Account No: SGM008" (customer)
 
 public record Totals(
     string? Subtotal,
     string? VatAmount,
     string? Total);
+
+public record Charge(
+    string? Label,              // e.g. "BCRS", "Discount"
+    string? Amount);
+
+/// <summary>A printed signature box or line OUTSIDE the stamps, e.g. "Received by ... Signature".</summary>
+public record Signature(
+    string? PrintedLabel,
+    string? Location,
+    bool IsSigned);
 
 public record Stamp(
     string? Text,               // printed text of the stamp, e.g. "Il-Mosta"

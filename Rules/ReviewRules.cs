@@ -5,12 +5,18 @@ namespace InvoiceExtractor.Rules;
 
 /// <summary>
 /// Business rules in plain C#. The model perceives; code decides.
+/// Flags already on the invoice (e.g. pen marks that could not be placed) are kept.
 /// </summary>
 public static class ReviewRules
 {
     public static InvoiceResult Apply(InvoiceResult invoice)
     {
-        var flags = new List<string>();
+        var flags = new List<string>(invoice.ReviewFlags);
+
+        // A skipped or failed pen-mark pass must never look like "no changes".
+        if (!invoice.PenMarksChecked)
+            flags.Add("Pen marks were NOT checked (pen-mark pass skipped or failed): strikeouts, corrections " +
+                      "and their signatures must be checked by hand.");
 
         // Rule from the task: every change (full or partial strikeout) needs a signature close by.
         foreach (var line in invoice.LineItems)
@@ -27,14 +33,24 @@ public static class ReviewRules
             }
         }
 
+        // Rule from the task: stamp information must also be signed.
         foreach (var stamp in invoice.Stamps)
         {
             if (!stamp.HasSignature)
                 flags.Add($"Stamp '{stamp.Text}' is not signed.");
         }
 
+        // Required header details.
+        if (string.IsNullOrWhiteSpace(invoice.Supplier?.Name))
+            flags.Add("Supplier name not found.");
+        if (string.IsNullOrWhiteSpace(invoice.Supplier?.Address))
+            flags.Add("Supplier address not found.");
         if (string.IsNullOrWhiteSpace(invoice.Supplier?.VatNumber))
             flags.Add("Supplier VAT number not found.");
+        if (string.IsNullOrWhiteSpace(invoice.InvoiceDate))
+            flags.Add("Invoice date not found.");
+        if (!invoice.Signatures.Any(s => s.IsSigned) && !invoice.Stamps.Any(s => s.HasSignature))
+            flags.Add("No signature found on the invoice.");
 
         if (invoice.ColumnMapping.Unmapped.Count > 0)
             flags.Add($"Columns with no agreed meaning (kept under OtherColumns): {string.Join(", ", invoice.ColumnMapping.Unmapped)}.");
@@ -48,7 +64,7 @@ public static class ReviewRules
     }
 
     /// <summary>
-    /// Checks the model's reading with arithmetic, and computes what is payable after
+    /// Checks the model's reading with arithmetic, and computes the line total after
     /// struck-out rows are removed and corrections applied. Null if there is no total column.
     /// </summary>
     private static Reconciliation? Reconcile(InvoiceResult invoice)
@@ -68,7 +84,11 @@ public static class ReviewRules
             }
             printedSum += printed.Value;
 
-            if (line.IsFullyStruckOut) continue;
+            if (line.IsFullyStruckOut)
+            {
+                notes.Add($"Line {line.RowNumber}: struck out, {printed:0.00} removed.");
+                continue;
+            }
 
             var totalCorrection = line.Corrections.LastOrDefault(c => c.Field == "TotalExclVat");
             var corrected = ColumnMapper.ParseAmount(totalCorrection?.NewValue);

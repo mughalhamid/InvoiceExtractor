@@ -11,11 +11,15 @@
   <ItemGroup>
     <!-- Renders PDF pages to PNG using PDFium. Native Windows binaries included. -->
     <PackageReference Include="PDFtoImage" Version="4.1.1" />
+    <!-- Pixel access for pen-ink detection; same version PDFtoImage already brings in. -->
+    <PackageReference Include="SkiaSharp" Version="2.88.8" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Column header -> field mapping; edit without recompiling -->
     <None Update="column-mappings.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Known suppliers by VAT number; edit without recompiling -->
+    <None Update="suppliers.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -30,13 +30,32 @@ public sealed class ColumnMapper
     }
 
     /// <summary>"Unit Price:" -> "unitprice", "+ VAT" -> "+vat" (the + is kept on purpose).</summary>
-    public static string Normalize(string header) =>
-        Regex.Replace(header.ToLowerInvariant(), @"[\s\.:]", "");
+    public static string Normalize(string? header) =>
+        Regex.Replace((header ?? "").ToLowerInvariant(), @"[\s\.:]", "");
 
-    public InvoiceResult Map(InvoiceExtraction x)
+    // The schema allows null list entries; treat them as absent instead of crashing.
+    // Pass 2 and the merger use these same lists, so row numbers line up everywhere.
+    public static List<string> ItemHeaders(InvoiceExtraction x) =>
+        (x.ItemTable?.Headers ?? []).Select(h => h ?? "").ToList();
+
+    public static List<TableRow> ItemRows(InvoiceExtraction x) =>
+        (x.ItemTable?.Rows ?? []).Where(r => r is not null).ToList();
+
+    /// <summary>Short printed text that identifies a row for the pen-mark prompt (the description cell if mapped).</summary>
+    public string RowLabel(IReadOnlyList<string> headers, TableRow row)
     {
-        var headers = x.ItemTable?.Headers ?? new List<string>();
-        var rows = x.ItemTable?.Rows ?? new List<TableRow>();
+        var cells = row.Cells ?? [];
+        for (var c = 0; c < headers.Count && c < cells.Count; c++)
+            if (_headerToField.GetValueOrDefault(Normalize(headers[c])) == "Description" && !string.IsNullOrWhiteSpace(cells[c]))
+                return cells[c]!;
+        return string.Join(" | ", cells.Where(v => !string.IsNullOrWhiteSpace(v)));
+    }
+
+    public InvoiceResult Map(InvoiceExtraction x, PartyResolver.Result parties,
+        IReadOnlyDictionary<int, RowMarks>? penMarks, bool penMarksChecked)
+    {
+        var headers = ItemHeaders(x);
+        var rows = ItemRows(x);
 
         // Decide each column's field once. If two columns claim the same field, the first wins.
         var columnField = new string?[headers.Count];
@@ -44,7 +63,8 @@ public sealed class ColumnMapper
         var unmapped = new List<string>();
         for (var c = 0; c < headers.Count; c++)
         {
-            if (_headerToField.TryGetValue(Normalize(headers[c]), out var field) && !mapped.ContainsValue(field))
+            if (_headerToField.TryGetValue(Normalize(headers[c]), out var field) &&
+                !mapped.ContainsValue(field) && !mapped.ContainsKey(headers[c]))
             {
                 columnField[c] = field;
                 mapped[headers[c]] = field;
@@ -59,7 +79,7 @@ public sealed class ColumnMapper
         for (var r = 0; r < rows.Count; r++)
         {
             var row = rows[r];
-            var cells = row.Cells ?? new List<string?>();
+            var cells = row.Cells ?? [];
             var values = new Dictionary<string, string?>();
             var other = new Dictionary<string, string?>();
 
@@ -70,9 +90,10 @@ public sealed class ColumnMapper
                 else other[headers[c]] = value;
             }
 
-            var corrections = (row.Corrections ?? new List<Correction>())
+            var marks = penMarks?.GetValueOrDefault(r) ?? RowMarks.None;
+            var corrections = marks.Corrections
                 .Select(k => new FieldCorrection(
-                    Field: _headerToField.TryGetValue(Normalize(k.Column ?? ""), out var f) ? f : k.Column ?? "?",
+                    Field: FieldOfColumn(headers, columnField, k.Column),
                     PrintedColumn: k.Column ?? "?",
                     k.OriginalValue, k.NewValue, k.HasSignatureNearby))
                 .ToList();
@@ -83,30 +104,58 @@ public sealed class ColumnMapper
                 Quantity: values.GetValueOrDefault("Quantity"),
                 UnitPrice: values.GetValueOrDefault("UnitPrice"),
                 VatRate: values.GetValueOrDefault("VatRate"),
+                VatAmount: values.GetValueOrDefault("VatAmount"),
                 TotalExclVat: values.GetValueOrDefault("TotalExclVat"),
                 TotalInclVat: values.GetValueOrDefault("TotalInclVat"),
                 Expiry: values.GetValueOrDefault("Expiry"),
                 OtherColumns: other,
-                IsFullyStruckOut: row.IsFullyStruckOut,
-                HasSignatureNearStrikeout: row.HasSignatureNearStrikeout,
+                IsFullyStruckOut: marks.IsFullyStruckOut,
+                HasSignatureNearStrikeout: marks.HasSignatureNearStrikeout,
                 Corrections: corrections));
         }
 
         return new InvoiceResult(
-            x.Supplier, x.Customer, x.InvoiceNumber, x.InvoiceDate, x.Currency,
+            parties.Supplier, parties.Customer, x.InvoiceNumber, x.InvoiceDate, x.Currency,
             lineItems, x.Totals,
-            x.Stamps ?? new List<Stamp>(),
-            x.HandwrittenNotes ?? new List<HandwrittenNote>(),
+            new PrintedTable(
+                (x.VatSummary?.Headers ?? []).Select(h => h ?? "").ToList(),
+                (x.VatSummary?.Rows ?? []).Where(r => r is not null).ToList()),
+            (x.OtherCharges ?? []).Where(v => v is not null).ToList(),
+            (x.Signatures ?? []).Where(s => s is not null).ToList(),
+            (x.Stamps ?? []).Where(s => s is not null).ToList(),
+            (x.HandwrittenNotes ?? []).Where(n => n is not null).ToList(),
             new ColumnMappingReport(mapped, unmapped),
+            new PartyReport(x.LogoText, (x.AddressBlocks ?? []).Where(b => b is not null).ToList(), parties.Notes),
+            penMarksChecked,
             Reconciliation: null,
-            ReviewFlags: new List<string>());
+            ReviewFlags: []);
     }
 
-    /// <summary>Parses printed amounts like "6.50", "19.500E", "€ 1,234.50". Null if not a number.</summary>
+    /// <summary>
+    /// The field a correction belongs to: the field of the column with that printed header,
+    /// so a correction to a column that lost the "first wins" contest is not mistaken for it.
+    /// </summary>
+    private static string FieldOfColumn(List<string> headers, string?[] columnField, string? column)
+    {
+        var c = headers.FindIndex(h => Normalize(h) == Normalize(column));
+        if (c >= 0 && columnField[c] is { } field) return field;
+        return column ?? "?";
+    }
+
+    /// <summary>
+    /// Parses printed amounts like "6.50", "19.500E", "€ 1,234.50", "6,50", "1.234,50". Null if not a number.
+    /// </summary>
     public static decimal? ParseAmount(string? s)
     {
         if (string.IsNullOrWhiteSpace(s)) return null;
-        var cleaned = Regex.Replace(s, @"[^\d\.,\-]", "").Replace(",", "");
+        var cleaned = Regex.Replace(s, @"[^\d\.,\-]", "");
+        int lastComma = cleaned.LastIndexOf(','), lastDot = cleaned.LastIndexOf('.');
+
+        if (lastComma > lastDot && Regex.IsMatch(cleaned, @",\d{1,2}$"))
+            cleaned = cleaned.Replace(".", "").Replace(',', '.');   // decimal comma: "6,50", "1.234,50"
+        else
+            cleaned = cleaned.Replace(",", "");                      // thousands comma: "1,234.50"
+
         return decimal.TryParse(cleaned, NumberStyles.Number, CultureInfo.InvariantCulture, out var v) ? v : null;
     }
 }

@@ -1,9 +1,9 @@
 namespace InvoiceExtractor.Models;
 
 // ---------------------------------------------------------------------------
-// What the APP returns: the model's raw extraction after C# has mapped the
-// printed columns to our fixed fields and applied the business rules.
-// This is the shape AutomateAP would eventually consume.
+// What the APP returns: pass 1's printed content after C# has decided the parties,
+// mapped the printed columns to our fixed fields, placed pass 2's pen marks and
+// applied the business rules. This is the shape AutomateAP would eventually consume.
 // ---------------------------------------------------------------------------
 
 public record InvoiceResult(
@@ -14,9 +14,14 @@ public record InvoiceResult(
     string? Currency,
     List<LineItem> LineItems,
     Totals Totals,
+    PrintedTable VatSummary,                     // footer VAT table, as printed
+    List<Charge> OtherCharges,                   // e.g. BCRS
+    List<Signature> Signatures,
     List<Stamp> Stamps,
     List<HandwrittenNote> HandwrittenNotes,
     ColumnMappingReport ColumnMapping,
+    PartyReport Parties,
+    bool PenMarksChecked,                        // false if pass 2 was skipped or failed
     Reconciliation? Reconciliation,
     List<string> ReviewFlags);
 
@@ -26,6 +31,7 @@ public record LineItem(
     string? Quantity,
     string? UnitPrice,
     string? VatRate,
+    string? VatAmount,
     string? TotalExclVat,
     string? TotalInclVat,
     string? Expiry,
@@ -47,10 +53,16 @@ public record ColumnMappingReport(
     Dictionary<string, string> Mapped,          // printed header -> field
     List<string> Unmapped);                      // printed headers with no known meaning
 
+/// <summary>The blocks as the model copied them, and how C# chose supplier and customer.</summary>
+public record PartyReport(
+    string? LogoText,
+    List<AddressBlock> AddressBlocks,
+    List<string> Decisions);
+
 /// <summary>Arithmetic done in C#, never by the model.</summary>
 public record Reconciliation(
     decimal SumOfPrintedLines,
     decimal? PrintedSubtotal,
     bool PrintedLinesMatchSubtotal,
-    decimal AdjustedTotal,                       // after removing struck-out rows and applying corrections
+    decimal AdjustedTotal,                       // line totals after removing struck-out rows and applying corrections
     List<string> Notes);
